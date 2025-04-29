@@ -87,6 +87,8 @@ class MlflowSpanProcessor(SimpleSpanProcessor):
             start_time_ns = get_otel_attribute(span, SpanAttributeKey.START_TIME_NS)
 
             trace_info = self._start_trace(span, start_time_ns)
+            print("Trace being registered")
+            print(span.context.trace_id)
             self._trace_manager.register_trace(span.context.trace_id, trace_info)
             request_id = trace_info.request_id
 
@@ -162,8 +164,12 @@ class MlflowSpanProcessor(SimpleSpanProcessor):
         Args:
             span: An OpenTelemetry ReadableSpan object that is ended.
         """
+        print("MLflowSpanProcessor on_end start --------------------")
+        print(span.to_json())
         # Processing the trace only when the root span is found.
         if span._parent is not None:
+            print("EXITING!!!!!!!")
+            print(span._parent)
             return
 
         request_id = get_otel_attribute(span, SpanAttributeKey.REQUEST_ID)
@@ -173,8 +179,13 @@ class MlflowSpanProcessor(SimpleSpanProcessor):
                 return
 
             self._update_trace_info(trace, span)
+            print(span.to_json())
             deduplicate_span_names_in_place(list(trace.span_dict.values()))
+            print("2"*20)
+            print(span.to_json())
 
+        print("MLflowSpanProcessor on_end end --------------------")
+        print(span.to_json())
         super().on_end(span)
 
     def _get_experiment_id_for_trace(self, span: OTelReadableSpan) -> str:

@@ -87,3 +87,5 @@ google-genai
 groq
 # Required by mlflow.mistral
 mistralai
+# smolagents
+smolagents[telemetry] == 1.14.0

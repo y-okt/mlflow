@@ -87,6 +87,10 @@ def start_detached_span(
         The newly created OpenTelemetry span.
     """
     tracer = _get_tracer(__name__)
+    print("STARTDETACEHEDSPAN!!!!!!!!!!!!")
+    print(dir(tracer) )
+    print(tracer.span_processor.__class__.__name__)
+    print(tracer.span_processor._span_processors)
     context = trace.set_span_in_context(parent) if parent else None
     attributes = {}
 
@@ -223,6 +227,7 @@ def _setup_tracer_provider(disabled=False):
     only once, and update the _MLFLOW_TRACER_PROVIDER_INITIALIZED flag accordingly.
     """
     global _MLFLOW_TRACER_PROVIDER
+    print("_get_tracer was called")
 
     if disabled:
         _MLFLOW_TRACER_PROVIDER = trace.NoOpTracerProvider()
