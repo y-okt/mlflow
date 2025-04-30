@@ -1,7 +1,4 @@
-import json
-
 import pytest
-import smolagents
 from smolagents import ChatMessage, CodeAgent, InferenceClientModel
 
 import mlflow
@@ -55,19 +52,19 @@ def test_smolagents_invoke_simple(monkeypatch, autolog):
     agent = CodeAgent(tools=[], model=model, add_base_tools=True)
     agent.run("Could you give me the 118th number in the Fibonacci sequence?")
 
-    print('finished agent run')
+    print("finished agent run")
     traces = get_traces()
     assert len(traces) == 1
     trace = traces[0]
-    print('get trace info', trace.info.request_id)
+    print("get trace info", trace.info.request_id)
     assert trace.info.request_id
     assert trace.info.experiment_id == "0"
     assert trace.info.timestamp_ms > 0
 
-    print('trace data spans', trace.data.spans)
+    print("trace data spans", trace.data.spans)
 
     for s in trace.data.spans:
-        print('parent_id', s.parent_id)
+        print("parent_id", s.parent_id)
 
     root_span = next((s for s in trace.data.spans if s.parent_id is None), None)
 

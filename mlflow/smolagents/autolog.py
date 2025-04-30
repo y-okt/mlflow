@@ -1,5 +1,5 @@
-import json
 import logging
+import json
 from typing import Optional, Union
 
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
@@ -12,12 +12,11 @@ from opentelemetry.trace import set_tracer_provider
 import mlflow
 from mlflow import MlflowClient
 from mlflow.entities import SpanType
-from mlflow.entities.span import _encode_span_id_to_byte, _encode_trace_id_to_byte
-from mlflow.tracing.constant import SpanAttributeKey
 from mlflow.tracing.processor.mlflow import MlflowSpanProcessor
 from mlflow.tracing.trace_manager import InMemoryTraceManager
-from mlflow.tracing.utils import encode_span_id
+from mlflow.tracing.constant import SpanAttributeKey
 from mlflow.tracking import MlflowClient
+from mlflow.tracing.utils import encode_span_id
 
 _logger = logging.getLogger(__name__)
 
@@ -46,13 +45,32 @@ class SmolagentsSpanProcessor(SimpleSpanProcessor):
         self._mlflow_span_processor = MlflowSpanProcessor(self.span_exporter, self._client)
 
     def on_start(self, span: OTelSpan, parent_context: Optional[Context] = None) -> None:
-        self._mlflow_span_processor.on_start(span, parent_context)
         self._base_span_processor.on_start(span, parent_context)
-
+        parent_id = encode_span_id(span.context.span_id)
+        request_id = self._trace_manager.get_request_id_from_trace_id(span.context.trace_id)
+        if parent_id:
+            self._client.start_span(
+                name=span.name,
+                request_id=request_id,
+                parent_id=parent_id,
+                span_type=_get_span_type(span),
+            )
+        else:
+            # self._client.start_trace(
+            #     name=span.name,
+            #     span_type=_get_span_type(span),
+            # )
+            mlflow.start_span(name=span.name)
+            
 
     def on_end(self, span: OTelReadableSpan) -> None:
+        request_id = json.loads(span.attributes.get(SpanAttributeKey.REQUEST_ID))
+        span_id = encode_span_id(span.context.span_id)
+        self._client.end_span(
+            request_id=request_id,
+            span_id=span_id,
+        )
         self._base_span_processor.on_end(span)
-        self._mlflow_span_processor.on_end(span)
 
     # def _on_start(self, span: OTelSpan, parent_context: Optional[Context] = None) -> None:
     #     print("Wrapper on start")
