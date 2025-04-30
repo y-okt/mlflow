@@ -34,19 +34,20 @@ class SmolagentsSpanProcessor(SimpleSpanProcessor):
         self._trace_manager = InMemoryTraceManager.get_instance()
         self.span_exporter = MlflowSpanExporter()
         self._span_token_dict = {}
+        self._trace_id_to_request_id_dict = {}
+        self._otel_span_id_to_mlflow_span = {}
 
     def on_start(self, span: OTelSpan, parent_context: Optional[Context] = None) -> None:
-        try:
-            parent = mlflow.get_current_active_span()
-        except Exception as e:
-            parent = None
-        print('parent', parent)
+        otel_parent_id = span.parent.span_id if span.parent else None
         span_type = _get_span_type(span)
-        if parent:
+        print('otel_parent_id', otel_parent_id)
+        if otel_parent_id is not None:
+            parent_mlflow_span = self._otel_span_id_to_mlflow_span.get(otel_parent_id, None)
+            print('parent_mlflow_span', parent_mlflow_span.request_id, parent_mlflow_span.parent_id)
             mlflow_span = self._client.start_span(
                 name=span.name,
-                request_id=parent.request_id,
-                parent_id=parent.span_id,
+                request_id=parent_mlflow_span.request_id,
+                parent_id=parent_mlflow_span.parent_id,
                 span_type=span_type,
                 # TODO: inplement inputs and attributes
             )
@@ -56,14 +57,18 @@ class SmolagentsSpanProcessor(SimpleSpanProcessor):
                 span_type=span_type,
                 # TODO: inputs, attributes, tags
             )
+        self._otel_span_id_to_mlflow_span[span.context.span_id] = mlflow_span
         token = set_span_in_context(mlflow_span)
         self._span_token_dict[span.context.span_id] = token
+        self._trace_id_to_request_id_dict[span.context.trace_id] = mlflow_span.request_id
 
     def on_end(self, span: OTelReadableSpan) -> None:
-        if span._parent is None:
-            request_id = str(span.context.trace_id)  # Use otel-generated trace_id as request_id
-        else:
-            request_id = self._trace_manager.get_request_id_from_trace_id(span.context.trace_id)
+        request_id = self._trace_id_to_request_id_dict.get(span.context.trace_id, None)
+        if request_id is None:
+            raise MlflowException(
+                f"Request ID for trace {span.context.trace_id} is not found. "
+                "Cannot end the span."
+            )
         try:
             self._client.end_span(
                 request_id=request_id,
