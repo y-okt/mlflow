@@ -696,6 +696,7 @@ def get_current_active_span() -> Optional[LiveSpan]:
         return None
 
     trace_manager = InMemoryTraceManager.get_instance()
+    print('attributes', otel_span.attributes)
     request_id = json.loads(otel_span.attributes.get(SpanAttributeKey.REQUEST_ID))
     return trace_manager.get_span_from_id(request_id, encode_span_id(otel_span.context.span_id))
 

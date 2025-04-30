@@ -1,25 +1,20 @@
-import logging
-import json
-from typing import Optional, Union
+from typing import Optional
 
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
 from opentelemetry.context import Context
 from opentelemetry.sdk.trace import ReadableSpan as OTelReadableSpan
-from opentelemetry.sdk.trace import Span as OTelSpan, TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor
+from opentelemetry.sdk.trace import Span as OTelSpan
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.trace import set_tracer_provider
 
-import mlflow
 from mlflow import MlflowClient
 from mlflow.entities import SpanType
-from mlflow.tracing.export.mlflow import MlflowSpanExporter
-from mlflow.tracing.processor.mlflow import MlflowSpanProcessor
-from mlflow.tracing.provider import set_span_in_context, detach_span_from_context
-from mlflow.tracing.trace_manager import InMemoryTraceManager
-from mlflow.tracing.constant import SpanAttributeKey
-from mlflow.tracking import MlflowClient
-from mlflow.tracing.utils import encode_span_id
 from mlflow.exceptions import MlflowException
+from mlflow.tracing.export.mlflow import MlflowSpanExporter
+from mlflow.tracing.provider import detach_span_from_context, set_span_in_context
+from mlflow.tracing.trace_manager import InMemoryTraceManager
+from mlflow.tracking import MlflowClient
 
 
 def _get_span_type(span: OTelSpan) -> str:
@@ -40,10 +35,10 @@ class SmolagentsSpanProcessor(SimpleSpanProcessor):
     def on_start(self, span: OTelSpan, parent_context: Optional[Context] = None) -> None:
         otel_parent_id = span.parent.span_id if span.parent else None
         span_type = _get_span_type(span)
-        print('otel_parent_id', otel_parent_id)
+        print("otel_parent_id", otel_parent_id)
         if otel_parent_id is not None:
             parent_mlflow_span = self._otel_span_id_to_mlflow_span.get(otel_parent_id, None)
-            print('parent_mlflow_span', parent_mlflow_span.request_id, parent_mlflow_span.parent_id)
+            print("parent_mlflow_span", parent_mlflow_span.request_id, parent_mlflow_span.parent_id)
             mlflow_span = self._client.start_span(
                 name=span.name,
                 request_id=parent_mlflow_span.request_id,
@@ -66,8 +61,7 @@ class SmolagentsSpanProcessor(SimpleSpanProcessor):
         request_id = self._trace_id_to_request_id_dict.get(span.context.trace_id, None)
         if request_id is None:
             raise MlflowException(
-                f"Request ID for trace {span.context.trace_id} is not found. "
-                "Cannot end the span."
+                f"Request ID for trace {span.context.trace_id} is not found. Cannot end the span."
             )
         try:
             self._client.end_span(
