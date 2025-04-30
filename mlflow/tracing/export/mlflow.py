@@ -54,7 +54,7 @@ class MlflowSpanExporter(SpanExporter):
         """
         print("Exporting span exporter called")
         for span in spans:
-            print('----------------exporttrace---------------')
+            print("----------------exporttrace---------------")
             print(span.to_json())
             if span._parent is not None:
                 _logger.debug("Received a non-root span. Skipping export.")

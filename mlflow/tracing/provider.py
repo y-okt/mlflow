@@ -88,7 +88,7 @@ def start_detached_span(
     """
     tracer = _get_tracer(__name__)
     print("STARTDETACEHEDSPAN!!!!!!!!!!!!")
-    print(dir(tracer) )
+    print(dir(tracer))
     print(tracer.span_processor.__class__.__name__)
     print(tracer.span_processor._span_processors)
     context = trace.set_span_in_context(parent) if parent else None

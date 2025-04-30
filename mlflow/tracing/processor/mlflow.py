@@ -181,7 +181,7 @@ class MlflowSpanProcessor(SimpleSpanProcessor):
             self._update_trace_info(trace, span)
             print(span.to_json())
             deduplicate_span_names_in_place(list(trace.span_dict.values()))
-            print("2"*20)
+            print("2" * 20)
             print(span.to_json())
 
         print("MLflowSpanProcessor on_end end --------------------")

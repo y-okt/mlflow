@@ -1,28 +1,23 @@
-import inspect
-import logging
 import json
+import logging
+from typing import Optional, Union
 
-from typing import Union, Optional
-
+from openinference.instrumentation.smolagents import SmolagentsInstrumentor
 from opentelemetry.context import Context
 from opentelemetry.sdk.trace import ReadableSpan as OTelReadableSpan
 from opentelemetry.sdk.trace import Span as OTelSpan
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor
 from opentelemetry.trace import set_tracer_provider
-from opentelemetry.trace import get_current_span, set_tracer_provider
+
 import mlflow
-from mlflow.entities import SpanType
 from mlflow import MlflowClient
-from mlflow.entities.span import LiveSpan
-from mlflow.entities import Span
+from mlflow.entities import SpanType
+from mlflow.entities.span import _encode_span_id_to_byte, _encode_trace_id_to_byte
+from mlflow.tracing.constant import SpanAttributeKey
+from mlflow.tracing.processor.mlflow import MlflowSpanProcessor
 from mlflow.tracing.trace_manager import InMemoryTraceManager
 from mlflow.tracing.utils import encode_span_id
-from mlflow.tracing.constant import SpanAttributeKey
-from mlflow.utils.autologging_utils.config import AutoLoggingConfig
-from mlflow.utils.mlflow_tags import MLFLOW_PARENT_RUN_ID
 from mlflow.tracking import MlflowClient
-from phoenix.otel import register
-from openinference.instrumentation.smolagents import SmolagentsInstrumentor
 
 _logger = logging.getLogger(__name__)
 
@@ -45,44 +40,65 @@ class SmolagentsSpanProcessor(SimpleSpanProcessor):
 
         if not self.span_exporter:
             raise ValueError("Span exporter not found in the base span processor.")
-        
+
         self._client = MlflowClient()
         self._trace_manager = InMemoryTraceManager.get_instance()
-    
+        self._mlflow_span_processor = MlflowSpanProcessor(self.span_exporter, self._client)
+
     def on_start(self, span: OTelSpan, parent_context: Optional[Context] = None) -> None:
-        print("Wrapper on start")
+        self._mlflow_span_processor.on_start(span, parent_context)
         self._base_span_processor.on_start(span, parent_context)
-        span_type = _get_span_type(span)
 
-
-        parent_span = mlflow.get_current_active_span()
-        if parent_span is not None:
-            self._client.start_span(
-                parent_span.name,
-                request_id=parent_span._trace_id,
-                parent_id=parent_span.span_id,
-                span_type=span_type
-            )
-
-        # request_id = self._trace_manager.get_request_id_from_trace_id(span.context.trace_id)
-
-        # if request_id is not None:
-        #     # parent_id = encode_span_id(span.parent.span_id)
-        #     parent_id = encode_span_id(span.context.span_id)
-        #     print("span has a parent", parent_id)
-        #     print('request_id', request_id, span.context.trace_id)
-        #     self._client.start_span(span.name, request_id=request_id, parent_id=parent_id, span_type=span_type)
-        print("on_start end")
 
     def on_end(self, span: OTelReadableSpan) -> None:
-        print("Wrapper on end")
-        if span.parent is not None:
-            # request_id = self._trace_manager.get_request_id_from_trace_id(span.context.trace_id)
-            request_id = json.loads(span.attributes.get(SpanAttributeKey.REQUEST_ID))
-            print('on_end request_id', request_id, encode_span_id(span.context.span_id))
-            self._client.end_span(request_id=request_id, span_id=encode_span_id(span.context.span_id))
-        # self._base_span_processor.on_end(span) # TODO: これが必要なのか？
-    
+        self._base_span_processor.on_end(span)
+        self._mlflow_span_processor.on_end(span)
+
+    # def _on_start(self, span: OTelSpan, parent_context: Optional[Context] = None) -> None:
+    #     print("Wrapper on start")
+    #     self._base_span_processor.on_start(span, parent_context)
+    #     span_type = _get_span_type(span)
+
+    #     # parent_span = mlflow.get_current_active_span()
+    #     # if parent_span is not None:
+    #     #     self._client.start_span(
+    #     #         parent_span.name,
+    #     #         request_id=parent_span._trace_id,
+    #     #         parent_id=parent_span.span_id,
+    #     #         span_type=span_type,
+    #     #     )
+
+    #     request_id = self._trace_manager.get_request_id_from_trace_id(span.context.trace_id)
+    #     # parent_id = encode_span_id(span.context.span_id)
+    #     # parent_id = _encode_span_id_to_byte(span.context.span_id)
+    #     live_span = self._trace_manager.get_span_from_id(request_id=request_id, span_id=encode_span_id(span.context.span_id))
+    #     if live_span is not None:
+    #         print('live_span', live_span.span_id)
+    #         parent_id = live_span.span_id
+    #     else:
+    #         print("live_span doesn't exist")
+    #         parent_id = None
+    #     # # parent_id = live_span.span_id
+
+    #     if request_id is not None and parent_id is not None:
+    #         print("span has a parent", parent_id)
+    #         print('request_id', request_id, span.context.trace_id)
+    #         self._client.start_span(span.name, request_id=request_id, parent_id=parent_id, span_type=span_type)
+    #     print("on_start end")
+
+    # def _on_end(self, span: OTelReadableSpan) -> None:
+    #     print("Wrapper on end")
+    #     # if span.parent is not None:
+    #         # request_id = self._trace_manager.get_request_id_from_trace_id(span.context.trace_id)
+    #     request_id = json.loads(span.attributes.get(SpanAttributeKey.REQUEST_ID))
+    #     # print("on_end request_id", request_id, encode_span_id(span.context.span_id))
+    #     span_id = _encode_span_id_to_byte(span.context.span_id)
+    #     print("on_end request_id", request_id, encode_span_id(span.context.span_id), span_id)
+    #     self._client.end_span(
+    #         request_id=request_id, span_id=span_id
+    #     )
+    #     # self._base_span_processor.on_end(span) # TODO: これが必要なのか？
+
 
 def _wrap_mlflow_processor_with_smolagents_processor():
     print("Wrap mlflow processor with smolagents processor")
@@ -93,13 +109,13 @@ def _wrap_mlflow_processor_with_smolagents_processor():
     ):
         print("MLFLOW_TRACER_PROVIDER is not initialized. Setting up tracer provider.")
         _setup_tracer_provider()
-    
+
     from mlflow.tracing.provider import _MLFLOW_TRACER_PROVIDER, _MLFLOW_TRACER_PROVIDER_INITIALIZED
 
     multi_processor = _MLFLOW_TRACER_PROVIDER._active_span_processor
     current_span_processor = multi_processor._span_processors[0]
     wrapped = SmolagentsSpanProcessor(current_span_processor)
-    multi_processor._span_processors = (wrapped, )
+    multi_processor._span_processors = (wrapped,)
 
     print("Wrapped span processor with SmolagentsSpanProcessor.")
 
@@ -118,6 +134,7 @@ def _set_tracer_provider_with_mlflow_tracer_provider():
 
 def _set_smolagents_instrumentor():
     from mlflow.tracing.provider import _MLFLOW_TRACER_PROVIDER
+
     SmolagentsInstrumentor().instrument(tracer_provider=_MLFLOW_TRACER_PROVIDER)
 
 

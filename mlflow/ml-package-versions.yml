@@ -884,7 +884,6 @@ crewai:
     requirements:
     run: pytest tests/crewai
 
-
 smolagents:
   package_info:
     pip_release: "smolagents"
@@ -899,7 +898,6 @@ smolagents:
       ">=1.14.0": "3.10"
     requirements:
     run: pytest tests/smolagents
-
 
 mistral:
   package_info:

@@ -1,10 +1,9 @@
+from openinference.instrumentation.smolagents import SmolagentsInstrumentor
 from smolagents import CodeAgent
 
 from mlflow.smolagents.autolog import setup_smolagents_tracing
 from mlflow.utils.annotations import experimental
 from mlflow.utils.autologging_utils import autologging_integration, safe_patch
-from openinference.instrumentation.smolagents import SmolagentsInstrumentor
-
 
 FLAVOR_NAME = "smolagents"
 
@@ -19,6 +18,7 @@ def autolog(
     """
     Enables (or disables) and configures autologging from Anthropic to MLflow.
     Only synchronous calls are supported. Asynchnorous APIs and streaming are not recorded.
+
     Args:
         log_traces: If ``True``, traces are logged for Anthropic models.
             If ``False``, no traces are collected during inference. Default to ``True``.
